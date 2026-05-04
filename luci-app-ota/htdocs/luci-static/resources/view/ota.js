@@ -3,31 +3,31 @@
 'require ui';
 'require rpc';
 
-var callOtaCheck = rpc.declare({
+const callOtaCheck = rpc.declare({
 	object: 'luci.ota',
 	method: 'check',
 	expect: { '': {} }
 });
 
-var callOtaDownload = rpc.declare({
+const callOtaDownload = rpc.declare({
 	object: 'luci.ota',
 	method: 'download',
 	expect: { '': {} }
 });
 
-var callOtaProgress = rpc.declare({
+const callOtaProgress = rpc.declare({
 	object: 'luci.ota',
 	method: 'progress',
 	expect: { '': {} }
 });
 
-var callOtaCancel = rpc.declare({
+const callOtaCancel = rpc.declare({
 	object: 'luci.ota',
 	method: 'cancel',
 	expect: { '': {} }
 });
 
-var callOtaApply = rpc.declare({
+const callOtaApply = rpc.declare({
 	object: 'luci.ota',
 	method: 'apply',
 	params: [ 'keep' ],
@@ -43,7 +43,7 @@ return view.extend({
 	cancelBtn: null,
 	isPollingPaused: false,
 
-	handleStateSwitch: function(to) {
+	handleStateSwitch(to) {
 		if (this.stateContainer) {
 			this.stateContainer.classList.remove('state-ctl-checked', 'state-ctl-downloading', 'state-ctl-downloaded');
 			if (to) {
@@ -52,13 +52,13 @@ return view.extend({
 		}
 	},
 
-	handleCheckUpdate: function(ev) {
+	handleCheckUpdate(ev) {
 		this.checkBtn.disabled = true;
 		this.checkResultLabel.textContent = '';
 		this.upgradeLogContainer.innerHTML = '<p class="spinning">' + _('Checking...') + '</p>';
 		this.handleStateSwitch(null);
 
-		return callOtaCheck().then(function(res) {
+		return callOtaCheck().then(res => {
 			this.checkBtn.disabled = false;
 
 			if (!res || res.code !== 0) {
@@ -68,8 +68,8 @@ return view.extend({
 				return;
 			}
 
-			var data = res.data || {};
-			var html = '';
+			const data = res.data || {};
+			let html = '';
 
 			if (data.latest === true) {
 				this.checkResultLabel.textContent = '';
@@ -93,19 +93,19 @@ return view.extend({
 
 			this.upgradeLogContainer.innerHTML = html;
 
-		}.bind(this)).catch(function(err) {
+		}).catch(err => {
 			this.checkBtn.disabled = false;
 			this.checkResultLabel.textContent = _('Check failed');
 			this.upgradeLogContainer.innerHTML = '';
 			ui.addNotification(null, E('p', {}, _('Check failed: %s').format(err.message || 'Unknown error')));
-		}.bind(this));
+		});
 	},
 
-	handleDownloadFirmware: function(ev) {
+	handleDownloadFirmware(ev) {
 		ev.target.disabled = true;
 		this.isPollingPaused = false;
 
-		return callOtaDownload().then(function(res) {
+		return callOtaDownload().then(res => {
 			ev.target.disabled = false;
 			if (res && res.code === 0) {
 				this.handleStateSwitch('downloading');
@@ -114,16 +114,16 @@ return view.extend({
 			} else {
 				ui.addNotification(null, E('p', {}, _('Download failed: %s').format(res ? res.msg : 'Unknown error')));
 			}
-		}.bind(this)).catch(function(err) {
+		}).catch(err => {
 			ev.target.disabled = false;
 			ui.addNotification(null, E('p', {}, _('Download failed: %s').format(err.message || 'Unknown error')));
-		}.bind(this));
+		});
 	},
 
-	pollDownloadProgress: function() {
+	pollDownloadProgress() {
 		if (this.isPollingPaused) return;
 
-		callOtaProgress().then(function(res) {
+		callOtaProgress().then(res => {
 			if (this.isPollingPaused) return;
 			if (!res) return;
 
@@ -131,7 +131,7 @@ return view.extend({
 				this.handleStateSwitch('downloaded');
 			} else if (res.code === 1) {
 				this.progressLabel.textContent = _('Downloading: %s').format(res.msg || '...');
-				window.setTimeout(this.pollDownloadProgress.bind(this), 1000);
+				window.setTimeout(() => this.pollDownloadProgress(), 1000);
 			} else if (res.code === 2) {
 				ui.addNotification(null, E('p', {}, _('Download canceled.')));
 				this.handleStateSwitch('checked');
@@ -139,41 +139,41 @@ return view.extend({
 				ui.addNotification(null, E('p', {}, _('Download failed: %s').format(res.msg || 'Unknown error')));
 				this.handleStateSwitch('checked');
 			}
-		}.bind(this));
+		});
 	},
 
-	handleCancelDownload: function(ev) {
+	handleCancelDownload(ev) {
 		this.isPollingPaused = true;
 		this.cancelBtn.disabled = true;
 		this.progressLabel.textContent = _('Canceling...');
 
-		callOtaCancel().then(function(res) {
+		callOtaCancel().then(res => {
 			this.handleStateSwitch('checked');
 			ui.addNotification(null, E('p', {}, _('Download canceled successfully.')));
-		}.bind(this)).catch(function(err) {
+		}).catch(err => {
 			ui.addNotification(null, E('p', {}, _('Cancel failed: %s').format(err.message || 'Unknown error')));
-		}.bind(this)).finally(function() {
+		}).finally(() => {
 			this.cancelBtn.disabled = false;
-		}.bind(this));
+		});
 	},
 
-	handleFlashImage: function(ev) {
+	handleFlashImage(ev) {
 		ev.preventDefault();
-		var keepCheckbox = ev.target.form.querySelector('input[name="keep"]');
-		var keep = keepCheckbox.checked ? 1 : 0;
+		const keepCheckbox = ev.target.form.querySelector('input[name="keep"]');
+		const keep = keepCheckbox.checked ? 1 : 0;
 		ev.target.disabled = true;
 
-		return callOtaApply(keep).then(function(res) {
+		return callOtaApply(keep).then(res => {
 			if (res && res.code === 0) {
 				ui.showModal(_('Flashing…'), [
 					E('p', { 'class': 'spinning' }, _('The system is flashing now.<br /> DO NOT POWER OFF THE DEVICE!<br /> Wait a few minutes before you try to reconnect. It might be necessary to renew the address of your computer to reach the device again, depending on your settings.'))
 				]);
 
-				var interval = window.setInterval(function() {
-					var img = new Image();
-					var target = window.location.protocol + '//' + window.location.host;
+				const interval = window.setInterval(() => {
+					const img = new Image();
+					const target = window.location.protocol + '//' + window.location.host;
 
-					img.onload = function() {
+					img.onload = () => {
 						window.clearInterval(interval);
 						window.location.replace(target);
 					};
@@ -185,63 +185,63 @@ return view.extend({
 				ev.target.disabled = false;
 				ui.addNotification(null, E('p', {}, _('Flash failed: %s').format(res ? res.msg : 'Unknown error')));
 			}
-		}).catch(function(err) {
+		}).catch(err => {
 			ev.target.disabled = false;
 			ui.addNotification(null, E('p', {}, _('Flash failed: %s').format(err.message || 'Unknown error')));
 		});
 	},
 
-	render: function() {
+	render() {
 		this.checkResultLabel = E('label', { 'class': 'cbi-value-title' });
 		this.upgradeLogContainer = E('div', { 'id': 'upgrade_log' });
 		this.progressLabel = E('label', { 'class': 'cbi-value-title' });
 
 		this.checkBtn = E('button', {
 			'class': 'cbi-button cbi-button-reload',
-			'click': this.handleCheckUpdate.bind(this)
+			'click': ui.createHandlerFn(this, 'handleCheckUpdate')
 		}, _('Check update'));
 
 		this.cancelBtn = E('button', {
 			'class': 'cbi-button cbi-button-reset',
-			'click': this.handleCancelDownload.bind(this)
+			'click': ui.createHandlerFn(this, 'handleCancelDownload')
 		}, _('Cancel download'));
 
-		this.stateContainer = E('div', { 'class': 'cbi-section state-ctl' },[
-			E('div', { 'class': 'cbi-section-node' },[
+		this.stateContainer = E('div', { 'class': 'cbi-section state-ctl' }, [
+			E('div', { 'class': 'cbi-section-node' }, [
 				E('div', { 'class': 'state state-checked' },
-					E('div', { 'class': 'cbi-value' },[
+					E('div', { 'class': 'cbi-value' }, [
 						this.checkResultLabel,
 						E('div', { 'class': 'cbi-value-field' },
 							E('button', {
 								'class': 'cbi-button cbi-button-apply',
-								'click': this.handleDownloadFirmware.bind(this)
+								'click': ui.createHandlerFn(this, 'handleDownloadFirmware')
 							}, _('Download firmware'))
 						)
 					])
 				),
 
 				E('div', { 'class': 'state state-downloading' },
-					E('div', { 'class': 'cbi-value' },[
+					E('div', { 'class': 'cbi-value' }, [
 						this.progressLabel,
 						E('div', { 'class': 'cbi-value-field' }, this.cancelBtn)
 					])
 				),
 
 				E('div', { 'class': 'state state-downloaded' },
-					E('form', { 'class': 'inline' },[
-						E('div', { 'class': 'cbi-value' },[
+					E('form', { 'class': 'inline' }, [
+						E('div', { 'class': 'cbi-value' }, [
 							E('label', { 'class': 'cbi-value-title', 'for': 'keep' }, _('Keep settings and retain the current configuration')),
 							E('div', { 'class': 'cbi-value-field' },
 								E('input', { 'type': 'checkbox', 'name': 'keep', 'id': 'keep', 'checked': 'checked' })
 							)
 						]),
 
-						E('div', { 'class': 'cbi-value cbi-value-last' },[
+						E('div', { 'class': 'cbi-value cbi-value-last' }, [
 							E('label', { 'class': 'cbi-value-title' }, _('Firmware downloaded')),
 							E('div', { 'class': 'cbi-value-field' },
 								E('button', {
 									'class': 'cbi-button cbi-input-apply',
-									'click': this.handleFlashImage.bind(this)
+									'click': ui.createHandlerFn(this, 'handleFlashImage')
 								}, _('Flash image...'))
 							)
 						])
@@ -252,7 +252,7 @@ return view.extend({
 			this.upgradeLogContainer
 		]);
 
-		return E('div', {},[
+		return E('div', {}, [
 			E('style', { 'type': 'text/css' },
 				'.state-ctl .state { display: none; }' +
 				'.state-ctl.state-ctl-checked .state.state-checked,' +
@@ -264,7 +264,7 @@ return view.extend({
 
 			E('h2', {}, _('OTA')),
 			E('p', {}, _('Check and upgrade firmware from the Internet')),
-			E('div', { 'class': 'cbi-value' },[
+			E('div', { 'class': 'cbi-value' }, [
 				E('label', { 'class': 'cbi-value-title' }),
 				E('div', { 'class': 'cbi-value-field' }, this.checkBtn)
 			]),
@@ -273,7 +273,7 @@ return view.extend({
 		]);
 	},
 
-	addFooter: function() {
+	addFooter() {
 		return E('div', {});
 	}
 
