@@ -43,6 +43,96 @@ return view.extend({
 	cancelBtn: null,
 	isPollingPaused: false,
 
+	renderMarkdown(text) {
+		if (!text) return '';
+		let html = '';
+		let inList = false;
+		let inOrderedList = false;
+		let inCodeBlock = false;
+		let lastType = 'block';
+
+		const renderInline = (s) => {
+			return s.replace(/\*\*\*(.*?)\*\*\*/g, '<b><i>$1</i></b>')
+				.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+				.replace(/\*(.*?)\*/g, '<i>$1</i>')
+				.replace(/__(.*?)__/g, '<b>$1</b>')
+				.replace(/_(.*?)_/g, '<i>$1</i>')
+				.replace(/~~(.*?)~~/g, '<del>$1</del>')
+				.replace(/`(.*?)`/g, '<code>$1</code>')
+				.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank">$1</a>');
+		};
+
+		text.split('\n').forEach(line => {
+			const trimmed = line.trim();
+
+			if (trimmed.startsWith('```')) {
+				if (inCodeBlock) {
+					html += '</pre>';
+					inCodeBlock = false;
+					lastType = 'block';
+				} else {
+					if (inList) { html += '</ul>'; inList = false; }
+					if (inOrderedList) { html += '</ol>'; inOrderedList = false; }
+					html += '<pre>';
+					inCodeBlock = true;
+				}
+				return;
+			}
+
+			if (inCodeBlock) {
+				html += line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '\n';
+				return;
+			}
+
+			if (trimmed === '') {
+				if (inList) { html += '</ul>'; inList = false; }
+				if (inOrderedList) { html += '</ol>'; inOrderedList = false; }
+				if (lastType === 'inline') {
+					html += '<br/>';
+					lastType = 'block';
+				}
+				return;
+			}
+
+			line = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+			let m;
+			if (m = line.match(/^(#+)\s+(.*)$/)) {
+				if (inList) { html += '</ul>'; inList = false; }
+				if (inOrderedList) { html += '</ol>'; inOrderedList = false; }
+				const tag = 'h' + Math.min(m[1].length + 2, 6);
+				html += '<' + tag + '>' + renderInline(m[2]) + '</' + tag + '>';
+				lastType = 'block';
+			} else if (m = line.match(/^>\s*(.*)$/)) {
+				if (inList) { html += '</ul>'; inList = false; }
+				if (inOrderedList) { html += '</ol>'; inOrderedList = false; }
+				html += '<blockquote>' + renderInline(m[1]) + '</blockquote>';
+				lastType = 'block';
+			} else if (m = line.match(/^[\-\*]\s+(.*)$/)) {
+				if (inOrderedList) { html += '</ol>'; inOrderedList = false; }
+				if (!inList) { html += '<ul>'; inList = true; }
+				html += '<li>' + renderInline(m[1]) + '</li>';
+				lastType = 'block';
+			} else if (m = line.match(/^\d+\.\s+(.*)$/)) {
+				if (inList) { html += '</ul>'; inList = false; }
+				if (!inOrderedList) { html += '<ol>'; inOrderedList = true; }
+				html += '<li>' + renderInline(m[1]) + '</li>';
+				lastType = 'block';
+			} else {
+				if (inList) { html += '</ul>'; inList = false; }
+				if (inOrderedList) { html += '</ol>'; inOrderedList = false; }
+				html += renderInline(line) + '<br/>';
+				lastType = 'inline';
+			}
+		});
+
+		if (inList) html += '</ul>';
+		if (inOrderedList) html += '</ol>';
+		if (inCodeBlock) html += '</pre>';
+
+		return html;
+	},
+
 	handleStateSwitch(to) {
 		if (this.stateContainer) {
 			this.stateContainer.classList.remove('state-ctl-checked', 'state-ctl-downloading', 'state-ctl-downloaded');
@@ -88,7 +178,7 @@ return view.extend({
 			}
 
 			if (data.logs) {
-				html += '<br/><br/><h4>' + _('Changelog') + '</h4><pre>' + data.logs + '</pre>';
+				html += '<br/><br/><h4>' + _('Changelog') + '</h4><div class="changelog-content">' + this.renderMarkdown(data.logs) + '</div>';
 			}
 
 			this.upgradeLogContainer.innerHTML = html;
@@ -259,7 +349,13 @@ return view.extend({
 				'.state-ctl.state-ctl-downloading .state.state-downloading,' +
 				'.state-ctl.state-ctl-downloaded .state.state-downloaded {' +
 				'	display: block;' +
-				'}'
+				'}' +
+				'.changelog-content { border: 1px solid #ddd; padding: 10px; border-radius: 8px; max-height: 450px; overflow-y: auto; }' +
+				'.changelog-content h3, .changelog-content h4, .changelog-content h5, .changelog-content h6 { margin: 10px 0 5px 0; }' +
+				'.changelog-content ul, .changelog-content ol { padding-left: 20px; margin: 5px 0; }' +
+				'.changelog-content blockquote { border-left: 4px solid #ddd; padding-left: 10px; color: #666; margin: 10px 0; }' +
+				'.changelog-content code { background: #eee; padding: 2px 4px; border-radius: 8px; font-family: monospace; }' +
+				'.changelog-content pre { background: #eee; padding: 10px; border-radius: 8px; overflow-x: auto; margin: 10px 0; font-family: monospace; }'
 			),
 
 			E('h2', {}, _('OTA')),
@@ -276,5 +372,4 @@ return view.extend({
 	addFooter() {
 		return E('div', {});
 	}
-
 });
